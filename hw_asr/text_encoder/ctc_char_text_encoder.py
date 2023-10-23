@@ -1,6 +1,7 @@
 from typing import List, NamedTuple
 
 import torch
+from torchaudio.models.decoder import ctc_decoder
 
 from .char_text_encoder import CharTextEncoder
 
@@ -16,6 +17,8 @@ class CTCCharTextEncoder(CharTextEncoder):
     def __init__(self, alphabet: List[str] = None):
         super().__init__(alphabet)
         vocab = [self.EMPTY_TOK] + list(self.alphabet)
+        self.vocab = vocab
+
         self.ind2char = dict(enumerate(vocab))
         self.char2ind = {v: k for k, v in self.ind2char.items()}
 
@@ -32,14 +35,27 @@ class CTCCharTextEncoder(CharTextEncoder):
         return ''.join(decoded_tokens)
 
     def ctc_beam_search(self, probs: torch.tensor, probs_length,
-                        beam_size: int = 100) -> List[Hypothesis]:
+                        beam_size: int = 100, nbest: int = 1) -> List[Hypothesis]:
         """
         Performs beam search and returns a list of pairs (hypothesis, hypothesis probability).
         """
         assert len(probs.shape) == 2
         char_length, voc_size = probs.shape
         assert voc_size == len(self.ind2char)
-        hypos: List[Hypothesis] = []
-        # TODO: your code here
-        raise NotImplementedError
-        return sorted(hypos, key=lambda x: x.prob, reverse=True)
+
+        decoder = ctc_decoder(
+            lexicon=None,
+            tokens=self.vocab,
+            lm=None,
+            nbest=nbest,
+            beam_size=beam_size,
+            blank_token=' ',
+            sil_token=CTCCharTextEncoder.EMPTY_TOK
+        )
+        ctc_hypos = decoder(emissions=probs.unsqueeze(dim=0))
+        hypos = []
+        for hypo in ctc_hypos[0]:
+            text = self.ctc_decode(hypo.tokens.tolist())
+            hypos.append(Hypothesis(text = text,
+                                    prob = hypo.score))
+        return hypos

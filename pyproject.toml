@@ -30,6 +30,8 @@ torch = { version = "2.1.0", source="torch"}
 torchaudio = { version = ">=2.0.0", source="torch"}
 torchvision = { version = ">=0.12.0", source="torch"}
 einops = "^0.7.0"
+pytorch-beam-search = "^1.2.2"
+flashlight-text = "^0.0.4"
 
 
 [build-system]
