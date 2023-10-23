@@ -75,6 +75,12 @@
         "args": {
           "name": "CER (argmax)"
         }
+      },
+      {
+        "type": "BeamSearchCERMetric",
+        "args": {
+          "name": "CER (beam)"
+        }
       }
     ],
     "lr_scheduler": {
@@ -88,7 +94,7 @@
       }
     },
     "trainer": {
-      "epochs": 49,
+      "epochs": 2,
       "save_dir": "saved/",
       "save_period": 5,
       "verbosity": 2,
