@@ -1,7 +1,11 @@
 from typing import List, NamedTuple
+from string import ascii_lowercase
 
 import torch
-from torchaudio.models.decoder import ctc_decoder
+from torchaudio.models.decoder import download_pretrained_files
+import kenlm
+from pyctcdecode import build_ctcdecoder
+
 
 from .char_text_encoder import CharTextEncoder
 
@@ -39,23 +43,41 @@ class CTCCharTextEncoder(CharTextEncoder):
         """
         Performs beam search and returns a list of pairs (hypothesis, hypothesis probability).
         """
-        assert len(probs.shape) == 2
-        char_length, voc_size = probs.shape
-        assert voc_size == len(self.ind2char)
+        #TODO
 
-        decoder = ctc_decoder(
-            lexicon=None,
-            tokens=self.vocab,
-            lm=None,
-            nbest=nbest,
-            beam_size=beam_size,
-            blank_token=' ',
-            sil_token=CTCCharTextEncoder.EMPTY_TOK
+
+class CTCCharTextEncoderWithLM(CharTextEncoder):
+    EMPTY_TOK = "^"
+
+    def __init__(self, alphabet: List[str] = None, model_path=None, alpha: float = 0.5, beta: float = 1.0):
+        if alphabet is None:
+            alphabet = [''] + list(ascii_lowercase) + [' ']
+        super().__init__(alphabet)
+
+        self.ind2char = dict(enumerate(alphabet))
+
+        if model_path is None:
+            files = download_pretrained_files("librispeech-4-gram")
+            model_path = files.lm
+
+        self.decoder = build_ctcdecoder(
+            alphabet,
+            kenlm_model_path=model_path,
+            alpha=alpha,
+            beta=beta,
         )
-        ctc_hypos = decoder(emissions=probs.unsqueeze(dim=0))
-        hypos = []
-        for hypo in ctc_hypos[0]:
-            text = self.ctc_decode(hypo.tokens.tolist())
-            hypos.append(Hypothesis(text = text,
-                                    prob = hypo.score))
-        return hypos
+    
+    def ctc_decode(self, inds: List[int]) -> str:
+        decoded_tokens = []
+        current_token = None
+
+        for index in inds:
+            token = self.ind2char[index]
+            if current_token is None or current_token != token:
+                current_token = token
+                if token != self.EMPTY_TOK:
+                    decoded_tokens.append(token)
+        return ''.join(decoded_tokens)
+
+    def ctc_decode_with_lm(self, logits: torch.tensor) -> str:
+        return self.decoder.decode(logits.detach().numpy())

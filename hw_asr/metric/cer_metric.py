@@ -7,6 +7,7 @@ import numpy as np
 
 from hw_asr.base.base_metric import BaseMetric
 from hw_asr.base.base_text_encoder import BaseTextEncoder
+from hw_asr.text_encoder.ctc_char_text_encoder import CTCCharTextEncoderWithLM
 from hw_asr.metric.utils import calc_cer
 
 
@@ -27,6 +28,21 @@ class ArgmaxCERMetric(BaseMetric):
                 pred_text = self.text_encoder.decode(log_prob_vec[:length])
             cers.append(calc_cer(target_text, pred_text))
         return sum(cers) / len(cers)
+    
+
+class CERMetricWithLM(BaseMetric):
+    def __init__(self, text_encoder: CTCCharTextEncoderWithLM, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.text_encoder = text_encoder
+
+    def __call__(self, log_probs: Tensor, log_probs_length: Tensor, text: List[str], **kwargs):
+        cers = []
+        log_probs = log_probs.cpu()
+        for batch, target_text in enumerate(text):
+            target_text = BaseTextEncoder.normalize_text(target_text)
+            pred_text = self.text_encoder.ctc_decode_with_lm(log_probs[batch])
+            cers.append(calc_cer(target_text, pred_text))
+        return np.mean(cers)
 
 
 class BeamSearchCERMetric(BaseMetric):

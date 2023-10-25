@@ -1245,6 +1245,20 @@ torch = ">=1.7.0"
 dev = ["coverage", "flake8", "mypy", "onnxruntime", "pdoc3", "resampy (==0.2.2)"]
 
 [[package]]
+name = "kenlm"
+version = "0.2.0"
+description = ""
+optional = false
+python-versions = "*"
+files = [
+    {file = "master.zip", hash = "sha256:4d002dcde70b52d519cafff4dc0008696c40cff1c9184a531b40c7b45905be6b"},
+]
+
+[package.source]
+type = "url"
+url = "https://github.com/kpu/kenlm/archive/master.zip"
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.5"
 description = "A fast implementation of the Cassowary constraint solver"
@@ -3630,4 +3644,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "1f65dd56211083964dfb49b40a9e0e2ef9e0bed80f8ca38856616f05a0027f22"
+content-hash = "25fc5af1ebbae7ebf4e3fe2f9648406e22abc217a8b54799561f3f6af973f8e1"

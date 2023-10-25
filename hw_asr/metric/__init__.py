@@ -1,9 +1,11 @@
-from hw_asr.metric.cer_metric import ArgmaxCERMetric, BeamSearchCERMetric
-from hw_asr.metric.wer_metric import ArgmaxWERMetric, BeamSearchWERMetric
+from hw_asr.metric.cer_metric import ArgmaxCERMetric, BeamSearchCERMetric, CERMetricWithLM
+from hw_asr.metric.wer_metric import ArgmaxWERMetric, BeamSearchWERMetric, WERMetricWithLM
 
 __all__ = [
     "ArgmaxWERMetric",
     "ArgmaxCERMetric",
     "BeamSearchCERMetric",
-    "BeamSearchWERMetric"
+    "BeamSearchWERMetric",
+    "CERMetricWithLM",
+    "WERMetricWithLM"
 ]
