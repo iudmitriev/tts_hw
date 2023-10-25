@@ -1,5 +1,5 @@
 {
-  "name": "deepspeech2_200_epochs",
+  "name": "deepspeech2_SGD",
   "n_gpu": 1,
   "preprocessing": {
     "sr": 16000,
@@ -78,9 +78,11 @@
     }
   },
   "optimizer": {
-    "type": "Adam",
+    "type": "SGD",
     "args": {
-      "lr": 3e-4
+      "lr": 1e-3,
+      "momentum": 0.9,
+      "weight_decay": 0.0005
     }
   },
   "loss": {
