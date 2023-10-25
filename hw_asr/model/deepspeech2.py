@@ -7,7 +7,7 @@ from hw_asr.base import BaseModel
 
 
 class DeepSpeech2Model(BaseModel):
-    def __init__(self, n_feats, n_class, hidden_channels=32, gru_hidden_size=800, gru_num_layers=5, bidirectional=False, linear_hidden_size=1600, **batch):
+    def __init__(self, n_feats, n_class, hidden_channels=32, gru_hidden_size=800, gru_num_layers=5, bidirectional=True, linear_hidden_size=1600, **batch):
         super().__init__(n_feats, n_class, **batch)
 
         self.conv = nn.Sequential(
@@ -24,6 +24,7 @@ class DeepSpeech2Model(BaseModel):
             linear_in_features = gru_hidden_size
         self.full = nn.Sequential(
             nn.Linear(in_features=linear_in_features, out_features=linear_hidden_size),
+            nn.ReLU(),
             nn.Linear(in_features=linear_hidden_size, out_features=n_class),
         )
 
