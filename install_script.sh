@@ -1,5 +1,7 @@
+sudo apt update
+sudo apt install python3-pip
 
-sudo apt install nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc
+pip install poetry
 
 mkdir lm
 cd lm
