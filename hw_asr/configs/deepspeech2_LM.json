@@ -1,5 +1,5 @@
 {
-    "name": "deepspeech2_200_epochs",
+    "name": "deepspeech2_LM",
     "n_gpu": 1,
     "preprocessing": {
       "sr": 16000,
@@ -21,16 +21,9 @@
         "bidirectional": true
       }
     },
-    "text_encoder": {
-        "type": "CTCCharTextEncoderWithLM",
-        "args": {
-            "alpha": 0.5,
-            "beta" : 1
-        }
-    },
     "data": {
       "train": {
-        "batch_size": 6,
+        "batch_size": 32,
         "num_workers": 5,
         "datasets": [
           {
@@ -60,40 +53,37 @@
         ]
       },
       "val": {
-        "batch_size": 6,
+        "batch_size": 32,
         "num_workers": 5,
         "datasets": [
           {
             "type": "LibrispeechDataset",
             "args": {
-              "part": "dev-clean",
-              "limit": 10
+              "part": "dev-clean"
             }
           }
         ]
       },
       "test-other": {
-        "batch_size": 6,
+        "batch_size": 32,
         "num_workers": 5,
         "datasets": [
           {
             "type": "LibrispeechDataset",
             "args": {
-              "part": "test-other",
-              "limit": 10
+              "part": "test-other"
             }
           }
         ]
       },
       "test-clean": {
-        "batch_size": 6,
+        "batch_size": 32,
         "num_workers": 5,
         "datasets": [
           {
             "type": "LibrispeechDataset",
             "args": {
-              "part": "test-clean",
-              "limit": 10
+              "part": "test-clean"
             }
           }
         ]
@@ -111,15 +101,15 @@
     },
     "metrics": [
       {
-        "type": "WERMetricWithLM",
+        "type": "ArgmaxWERMetric",
         "args": {
-          "name": "WER (with LM)"
+          "name": "WER (argmax)"
         }
       },
       {
-        "type": "CERMetricWithLM",
+        "type": "ArgmaxCERMetric",
         "args": {
-          "name": "CER (with LM)"
+          "name": "CER (argmax)"
         }
       }
     ],
@@ -127,7 +117,7 @@
       "type": "OneCycleLR",
       "args": {
         "steps_per_epoch": 100,
-        "epochs": 100,
+        "epochs": 201,
         "anneal_strategy": "cos",
         "max_lr": 3e-4,
         "pct_start": 0.2
@@ -142,8 +132,8 @@
       "early_stop": 500,
       "visualize": "wandb",
       "wandb_project": "asr_project",
-      "len_epoch": 100,
+      "len_epoch": 500,
       "grad_norm_clip": 10
     }
-  }
+}
   
