@@ -1,3 +1,6 @@
+
+sudo apt install nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc
+
 mkdir lm
 cd lm
 git clone https://github.com/kpu/kenlm
