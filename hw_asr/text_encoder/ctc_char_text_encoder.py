@@ -44,14 +44,14 @@ class CTCCharTextEncoder(CharTextEncoder):
         Performs beam search and returns a list of pairs (hypothesis, hypothesis probability).
         """
         assert len(probs.shape) == 2
-        char_length, voc_size = probs.shape
+        token_length, voc_size = probs.shape
         assert voc_size == len(self.ind2char)
         hypos: List[Hypothesis] = [Hypothesis("", 0)]
 
         for frame in probs:
             hypos = self._extend_hypos(frame, hypos)
             hypos = sorted(hypos, key=lambda x: x.prob, reverse=True)[:beam_size]
-        return sorted(hypos, key=lambda x: x.prob, reverse=True)
+        return hypos
     
 
     def _extend_hypos(self, frame, hypos):
@@ -65,6 +65,7 @@ class CTCCharTextEncoder(CharTextEncoder):
                     new_text = hypo.text
                 else:
                     new_text = hypo.text + token
+                
                 new_prob = hypo.prob * token_proba
                 new_hypos[new_text] += new_prob
         hypos = [Hypothesis(text, prob) for text, prob in new_hypos.items()]
