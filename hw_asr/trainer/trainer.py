@@ -88,6 +88,7 @@ class Trainer(BaseTrainer):
                 tqdm(self.train_dataloader, desc="train", total=self.len_epoch)
         ):
             try:
+                self._log_audio(batch)
                 batch = self.process_batch(
                     batch,
                     is_train=True,
@@ -253,6 +254,10 @@ class Trainer(BaseTrainer):
             norm_type,
         )
         return total_norm.item()
+
+    def _log_audio(self, audio_batch):
+        audio = random.choice(audio_batch['audio'].cpu())
+        self.writer.add_audio("audio", audio, sample_rate=self.config["preprocessing"]["sr"])
 
     def _log_scalars(self, metric_tracker: MetricTracker):
         if self.writer is None:
