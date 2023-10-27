@@ -33,6 +33,7 @@ einops = "^0.7.0"
 pytorch-beam-search = "^1.2.2"
 flashlight-text = "^0.0.4"
 kenlm = {url = "https://github.com/kpu/kenlm/archive/master.zip"}
+gdown = "^4.7.1"
 
 
 [build-system]
