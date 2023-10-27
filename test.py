@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import torch
+import numpy as np
 from tqdm import tqdm
 
 import hw_asr.model as module_model
@@ -11,6 +12,7 @@ from hw_asr.trainer import Trainer
 from hw_asr.utils import ROOT_PATH
 from hw_asr.utils.object_loading import get_dataloaders
 from hw_asr.utils.parse_config import ConfigParser
+from hw_asr.metric.utils import calc_cer, calc_wer
 
 DEFAULT_CHECKPOINT_PATH = ROOT_PATH / "default_test_model" / "checkpoint.pth"
 
@@ -43,6 +45,8 @@ def main(config, out_file):
     model.eval()
 
     results = []
+    cers = []
+    wers = []
 
     with torch.no_grad():
         for batch_num, batch in enumerate(tqdm(dataloaders["test"])):
@@ -61,15 +65,22 @@ def main(config, out_file):
             for i in range(len(batch["text"])):
                 argmax = batch["argmax"][i]
                 argmax = argmax[: int(batch["log_probs_length"][i])]
-                results.append(
-                    {
+                result = {
                         "ground_trurh": batch["text"][i],
                         "pred_text_argmax": text_encoder.ctc_decode(argmax.cpu().numpy()),
                         "pred_text_beam_search": text_encoder.ctc_beam_search(
-                            batch["probs"][i], batch["log_probs_length"][i], beam_size=100
+                            batch["probs"][i], batch["log_probs_length"][i], beam_size=512
                         )[:10],
-                    }
-                )
+                }
+                results.append(result)
+
+                cers.append(calc_cer(result["ground_trurh"], result["pred_text_beam_search"][0].text))
+                wers.append(calc_wer(result["ground_trurh"], result["pred_text_beam_search"][0].text))
+
+
+    print(f'CER on test: {np.mean(cers)}')
+    print(f'WER on test: {np.mean(wers)}')
+
     with Path(out_file).open("w") as f:
         json.dump(results, f, indent=2)
 
