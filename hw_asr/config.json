@@ -1,5 +1,5 @@
 {
-  "name": "default_config",
+  "name": "deepspeech2_LM",
   "n_gpu": 1,
   "preprocessing": {
     "sr": 16000,
@@ -15,15 +15,15 @@
     "spectrogram": []
   },
   "arch": {
-    "type": "BaselineModel",
+    "type": "DeepSpeech2Model",
     "args": {
       "n_feats": 128,
-      "fc_hidden": 512
+      "bidirectional": true
     }
   },
   "data": {
     "train": {
-      "batch_size": 50,
+      "batch_size": 32,
       "num_workers": 5,
       "datasets": [
         {
@@ -31,16 +31,15 @@
           "args": {
             "part": "train-clean-100",
             "max_audio_length": 20.0,
-            "max_text_length": 200
-          },
-          "module": "hw_asr.model"
+            "max_text_length": 300
+          }
         },
         {
           "type": "LibrispeechDataset",
           "args": {
             "part": "train-clean-360",
             "max_audio_length": 20.0,
-            "max_text_length": 200
+            "max_text_length": 300
           }
         },
         {
@@ -48,13 +47,13 @@
           "args": {
             "part": "train-other-500",
             "max_audio_length": 20.0,
-            "max_text_length": 200
+            "max_text_length": 300
           }
         }
       ]
     },
     "val": {
-      "batch_size": 30,
+      "batch_size": 32,
       "num_workers": 5,
       "datasets": [
         {
@@ -64,34 +63,10 @@
           }
         }
       ]
-    },
-    "test-other": {
-      "batch_size": 30,
-      "num_workers": 5,
-      "datasets": [
-        {
-          "type": "LibrispeechDataset",
-          "args": {
-            "part": "test-other"
-          }
-        }
-      ]
-    },
-    "test-clean": {
-      "batch_size": 30,
-      "num_workers": 5,
-      "datasets": [
-        {
-          "type": "LibrispeechDataset",
-          "args": {
-            "part": "test-clean"
-          }
-        }
-      ]
     }
   },
   "optimizer": {
-    "type": "Adam",
+    "type": "AdamW",
     "args": {
       "lr": 3e-4
     }
@@ -117,23 +92,24 @@
   "lr_scheduler": {
     "type": "OneCycleLR",
     "args": {
-      "steps_per_epoch": 100,
-      "epochs": 50,
+      "steps_per_epoch": 500,
+      "epochs": 101,
       "anneal_strategy": "cos",
       "max_lr": 3e-4,
       "pct_start": 0.2
     }
   },
   "trainer": {
-    "epochs": 50,
+    "epochs": 100,
     "save_dir": "saved/",
     "save_period": 5,
     "verbosity": 2,
     "monitor": "min val_loss",
-    "early_stop": 100,
+    "early_stop": 500,
     "visualize": "wandb",
     "wandb_project": "asr_project",
-    "len_epoch": 100,
+    "len_epoch": 500,
     "grad_norm_clip": 10
   }
 }
+
