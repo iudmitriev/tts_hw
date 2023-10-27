@@ -1,15 +1,11 @@
 FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
 WORKDIR /repos/asr_project_template
 
-# Install requirements for torchaudio
-RUN pip install sox && conda install torchaudio==0.11.0 -c pytorch && conda install -c conda-forge librosa
-
-# Install requirements
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
-
-# Copy the contents of repository
 COPY . .
 
-# Expose port
+RUN pip install poetry
+RUN poetry config virtualenvs.create false
+RUN poetry install
+
+# Expose port (for some reason...)
 EXPOSE 3000
