@@ -16,7 +16,7 @@ class Hypothesis(NamedTuple):
 
 
 class CTCCharTextEncoder(CharTextEncoder):
-    EMPTY_TOK = ""
+    EMPTY_TOK = "^"
 
     def __init__(self, alphabet: List[str] = None, model_path=None, alpha=0.5, beta=0.5):
         super().__init__(alphabet)
@@ -31,8 +31,9 @@ class CTCCharTextEncoder(CharTextEncoder):
             files = download_pretrained_files("librispeech-4-gram")
             model_path = files.lm
 
+        decoder_vocab = [""] + list(self.alphabet)
         self.decoder = build_ctcdecoder(
-            vocab,
+            decoder_vocab,
             kenlm_model_path=model_path,
             alpha=alpha,
             beta=beta,
@@ -63,24 +64,6 @@ class CTCCharTextEncoder(CharTextEncoder):
             Hypothesis(text=text, prob=1)
         ]
         return final_hypos
-   
-
-    def _extend_hypos(self, frame, hypos):
-        new_hypos = defaultdict(float)
-        for token_index, token_proba in enumerate(frame):
-            token = self.ind2char[token_index]
-            for hypo in hypos:
-                current_token = hypo.text[-1] if len(hypo.text) != 0 else ""
-                
-                if token == current_token or token == self.EMPTY_TOK:
-                    new_text = hypo.text
-                else:
-                    new_text = hypo.text + token
-                
-                new_prob = hypo.prob * token_proba
-                new_hypos[new_text] += new_prob
-        hypos = [Hypothesis(text, prob) for text, prob in new_hypos.items()]
-        return hypos
 
 
 class CTCCharTextEncoderWithBeamSearch(CharTextEncoder):
