@@ -6,13 +6,13 @@
 The best way to use this project is using docker
 
 ```shell 
-docker build -t hw_asr_image . 
+docker build -t src_image . 
 docker run \
    --gpus '"device=0"' \
    -it --rm \
    -v /path/to/local/storage/dir:/repos/asr_project_template/data/datasets \
    -e WANDB_API_KEY=<your_wandb_api_key> \
-	hw_asr_image python -m unittest 
+	src_image python -m unittest 
 ```
 Notes:
 
@@ -55,7 +55,7 @@ sh download_best_model.sh
 #### Training
 To train this model independently, you should run
 ```shell 
-python train.py -c hw_asr/configs/config.json
+python train.py -c src/configs/config.json
 ```
 
 #### Scores

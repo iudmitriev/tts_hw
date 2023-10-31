@@ -3,7 +3,7 @@ from torch import nn
 
 from einops import rearrange 
 
-from hw_asr.base import BaseModel
+from src.base import BaseModel
 
 
 class DeepSpeech2Model(BaseModel):

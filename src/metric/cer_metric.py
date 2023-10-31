@@ -5,9 +5,9 @@ from torch import Tensor
 
 import numpy as np
 
-from hw_asr.base.base_metric import BaseMetric
-from hw_asr.base.base_text_encoder import BaseTextEncoder
-from hw_asr.metric.utils import calc_cer
+from src.base.base_metric import BaseMetric
+from src.base.base_text_encoder import BaseTextEncoder
+from src.metric.utils import calc_cer
 
 
 class ArgmaxCERMetric(BaseMetric):

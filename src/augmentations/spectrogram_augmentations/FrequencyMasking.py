@@ -1,7 +1,7 @@
 from torch import Tensor
 import torchaudio.transforms as transforms
 
-from hw_asr.augmentations.base import AugmentationBase
+from src.augmentations.base import AugmentationBase
 
 
 class FrequencyMasking(AugmentationBase):

@@ -1,6 +1,6 @@
 import unittest
 
-from hw_asr.text_encoder.ctc_char_text_encoder import CTCCharTextEncoder
+from src.text_encoder.ctc_char_text_encoder import CTCCharTextEncoder
 
 
 class TestTextEncoder(unittest.TestCase):
