@@ -2,9 +2,12 @@ from abc import abstractmethod
 
 import torch
 from numpy import inf
+import logging
+from pathlib import Path
 
 from src.base import BaseModel
 from src.logger import get_visualizer
+from src.utils import get_savedir
 
 
 class BaseTrainer:
@@ -15,7 +18,9 @@ class BaseTrainer:
     def __init__(self, model: BaseModel, criterion, metrics, optimizer, config, device):
         self.device = device
         self.config = config
-        self.logger = config.get_logger("trainer", config["trainer"]["verbosity"])
+
+        self.logger = logging.getLogger("train")
+        self.logger.setLevel(logging.DEBUG)
 
         self.model = model
         self.criterion = criterion
@@ -45,14 +50,14 @@ class BaseTrainer:
 
         self.start_epoch = 1
 
-        self.checkpoint_dir = config.save_dir
+        self.checkpoint_dir = get_savedir(config)
 
         # setup visualization writer instance
         self.writer = get_visualizer(
             config, self.logger, cfg_trainer["visualize"]
         )
 
-        if config.resume is not None:
+        if "resume" in config:
             self._resume_checkpoint(config.resume)
 
     @abstractmethod

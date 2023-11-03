@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "asr-hw"
+name = "ss-hw"
 version = "0.1.0"
 description = "DLA homework"
 authors = ["Ivan Dmitriev <i.u.dmitriev@gmail.com>"]
@@ -34,6 +34,8 @@ pytorch-beam-search = "^1.2.2"
 flashlight-text = "^0.0.4"
 kenlm = {url = "https://github.com/kpu/kenlm/archive/master.zip"}
 gdown = "^4.7.1"
+hydra-core = "^1.3.2"
+omegaconf = "^2.3.0"
 
 
 [build-system]

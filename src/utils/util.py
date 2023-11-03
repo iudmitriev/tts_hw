@@ -2,12 +2,22 @@ import json
 from collections import OrderedDict
 from itertools import repeat
 from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 import torch
 
 ROOT_PATH = Path(__file__).absolute().resolve().parent.parent.parent
 
+
+def get_savedir(config):
+    save_dir = Path(config["trainer"]["save_dir"])
+    exper_name = config["name"]
+    run_id = datetime.now().strftime(r"%m%d_%H%M%S")
+    run_dir = save_dir / "models" / exper_name / run_id
+    if not run_dir.is_dir():
+        run_dir.mkdir(parents=True, exist_ok=False)
+    return run_dir
 
 def ensure_dir(dirname):
     dirname = Path(dirname)

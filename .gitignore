@@ -107,8 +107,8 @@ saved/
 wandb/
 lm/
 test_models/
-best_model/
 default_test_model/
+outputs/
 
 # editor, os cache directory
 .vscode/

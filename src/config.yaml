@@ -1,0 +1,69 @@
+name: deepspeech2_LM
+n_gpu: 1
+preprocessing:
+  sr: 16000
+  spectrogram:
+    _target_: torchaudio.transforms.MelSpectrogram
+  log_spec: true
+
+augmentations:
+  wave:
+    gain:
+      _target_: src.augmentations.wave_augmentations.Gain
+arch:
+  _target_: src.model.DeepSpeech2Model
+  n_feats: 128
+  bidirectional: true
+data:
+  train:
+    batch_size: 4
+    num_workers: 5
+    datasets:
+      dev-clean:
+        _target_: src.datasets.LibrispeechDataset
+        part: "dev-clean"
+        limit: 10
+      clean-100:
+        _target_: src.datasets.LibrispeechDataset
+        part: "train-clean-100"
+        max_audio_length: 20.0
+        max_text_length: 300
+        limit: 10
+  val:
+    batch_size: 4
+    num_workers: 5
+    datasets:
+      dev-clean:
+        _target_: src.datasets.LibrispeechDataset
+        part: "dev-clean"
+        limit: 10
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 3e-4
+loss:
+  _target_: src.loss.CTCLoss
+metrics:
+  argmax_wer:
+    _target_: src.metric.ArgmaxWERMetric
+    name: "WER (argmax)"
+  argmax_cer:
+    _target_: src.metric.ArgmaxCERMetric
+    name: "CER (argmax)"
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.OneCycleLR
+  steps_per_epoch: 500
+  epochs: 101
+  anneal_strategy: "cos"
+  max_lr: 3e-4
+  pct_start: 0.2
+trainer:
+  epochs: 3
+  save_dir: "saved/"
+  save_period: 5
+  verbosity: 2
+  monitor: "min val_loss"
+  early_stop: 500
+  visualize: "wandb"
+  wandb_project: "trash"
+  len_epoch: 10
+  grad_norm_clip: 10

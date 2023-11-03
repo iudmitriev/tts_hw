@@ -1,17 +1,20 @@
-import argparse
 import collections
 import warnings
 
 import numpy as np
 import torch
+import hydra
+import logging
+
+from omegaconf.dictconfig import DictConfig
 
 import src.loss as module_loss
 import src.metric as module_metric
 import src.model as module_arch
+import src.text_encoder as module_text_encoder
 from src.trainer import Trainer
 from src.utils import prepare_device
 from src.utils.object_loading import get_dataloaders
-from src.utils.parse_config import ConfigParser
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -22,18 +25,22 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
-
-def main(config):
-    logger = config.get_logger("train")
+@hydra.main(version_base=None, config_path="src", config_name="config")
+def main(config: DictConfig):
+    logger = logging.getLogger("train")
+    logger.setLevel(logging.DEBUG)
 
     # text_encoder
-    text_encoder = config.get_text_encoder()
+    if "text_encoder" not in config:
+        text_encoder = module_text_encoder.CTCCharTextEncoder()
+    else:
+        text_encoder = hydra.utils.instantiate(config["text_encoder"])
 
     # setup data_loader instances
     dataloaders = get_dataloaders(config, text_encoder)
 
     # build model architecture, then print to console
-    model = config.init_obj(config["arch"], module_arch, n_class=len(text_encoder))
+    model = hydra.utils.instantiate(config["arch"], n_class=len(text_encoder))
     logger.info(model)
 
     # prepare for (multi-device) GPU training
@@ -43,17 +50,18 @@ def main(config):
         model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     # get function handles of loss and metrics
-    loss_module = config.init_obj(config["loss"], module_loss).to(device)
+    loss_module = hydra.utils.instantiate(config["loss"]).to(device)
+
     metrics = [
-        config.init_obj(metric_dict, module_metric, text_encoder=text_encoder)
-        for metric_dict in config["metrics"]
+        hydra.utils.instantiate(metric, text_encoder=text_encoder)
+        for metric_name, metric in config["metrics"].items()
     ]
 
     # build optimizer, learning rate scheduler. delete every line containing lr_scheduler for
     # disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = config.init_obj(config["optimizer"], torch.optim, trainable_params)
-    lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
+    optimizer = hydra.utils.instantiate(config["optimizer"], trainable_params)
+    lr_scheduler = hydra.utils.instantiate(config["lr_scheduler"], optimizer)
 
     trainer = Trainer(
         model,
@@ -72,36 +80,4 @@ def main(config):
 
 
 if __name__ == "__main__":
-    args = argparse.ArgumentParser(description="PyTorch Template")
-    args.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        type=str,
-        help="config file path (default: None)",
-    )
-    args.add_argument(
-        "-r",
-        "--resume",
-        default=None,
-        type=str,
-        help="path to latest checkpoint (default: None)",
-    )
-    args.add_argument(
-        "-d",
-        "--device",
-        default=None,
-        type=str,
-        help="indices of GPUs to enable (default: all)",
-    )
-
-    # custom cli options to modify configuration from default values given in json file.
-    CustomArgs = collections.namedtuple("CustomArgs", "flags type target")
-    options = [
-        CustomArgs(["--lr", "--learning_rate"], type=float, target="optimizer;args;lr"),
-        CustomArgs(
-            ["--bs", "--batch_size"], type=int, target="data_loader;args;batch_size"
-        ),
-    ]
-    config = ConfigParser.from_args(args, options)
-    main(config)
+    main()

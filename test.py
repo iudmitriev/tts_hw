@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from tqdm import tqdm
+import hydra
 
 import src.model as module_model
 from src.trainer import Trainer
@@ -16,7 +17,7 @@ from src.metric.utils import calc_cer, calc_wer
 
 DEFAULT_CHECKPOINT_PATH = ROOT_PATH / "default_test_model" / "checkpoint.pth"
 
-
+@hydra.main(version_base=None, config_path="src", config_name="config")
 def main(config, out_file):
     logger = config.get_logger("test")
 
@@ -86,6 +87,8 @@ def main(config, out_file):
 
 
 if __name__ == "__main__":
+    raise NotImplementedError('test.py is not yet updated to hydra configs')
+    '''
     args = argparse.ArgumentParser(description="PyTorch Template")
     args.add_argument(
         "-c",
@@ -138,10 +141,9 @@ if __name__ == "__main__":
     )
 
     args = args.parse_args()
-
     # set GPUs
-    if args.device is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
+    #if args.device is not None:
+    #    os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
     # first, we need to obtain config with model parameters
     # we assume it is located with checkpoint in the same folder
@@ -181,3 +183,4 @@ if __name__ == "__main__":
     config["data"]["test"]["n_jobs"] = args.jobs
 
     main(config, args.output)
+    '''
