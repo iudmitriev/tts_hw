@@ -14,7 +14,7 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 URL_LINKS = {
-    "dataset": "https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2", 
+    "dataset": "https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2"
 }
 
 
@@ -29,14 +29,14 @@ class LJspeechDataset(BaseDataset):
         super().__init__(index, *args, **kwargs)
 
     def _load_dataset(self):
-        arch_path = self._data_dir / "LJSpeech-1.1.tar.bz2"
-        print(f"Loading LJSpeech")
-        download_file(URL_LINKS["dataset"], arch_path)
-        shutil.unpack_archive(arch_path, self._data_dir)
-        for fpath in (self._data_dir / "LJSpeech-1.1").iterdir():
-            shutil.move(str(fpath), str(self._data_dir / fpath.name))
-        os.remove(str(arch_path))
-        shutil.rmtree(str(self._data_dir / "LJSpeech-1.1"))
+        #arch_path = self._data_dir / "LJSpeech-1.1.tar.bz2"
+        #print(f"Loading LJSpeech")
+        #download_file(URL_LINKS["dataset"], arch_path)
+        #shutil.unpack_archive(arch_path, self._data_dir)
+        #for fpath in (self._data_dir / "LJSpeech-1.1").iterdir():
+        #    shutil.move(str(fpath), str(self._data_dir / fpath.name))
+        #os.remove(str(arch_path))
+        #shutil.rmtree(str(self._data_dir / "LJSpeech-1.1"))
 
         files = [file_name for file_name in (self._data_dir / "wavs").iterdir()]
         train_length = int(0.85 * len(files)) # hand split, test ~ 15% 
@@ -44,11 +44,9 @@ class LJspeechDataset(BaseDataset):
         (self._data_dir / "test").mkdir(exist_ok=True, parents=True)
         for i, fpath in enumerate((self._data_dir / "wavs").iterdir()):
             if i < train_length:
-                shutil.move(str(fpath), str(self._data_dir / "train" / fpath.name))
+                shutil.copy(str(fpath), str(self._data_dir / "train" / fpath.name))
             else:
-                shutil.move(str(fpath), str(self._data_dir / "test" / fpath.name))
-        shutil.rmtree(str(self._data_dir / "wavs"))
-
+                shutil.copy(str(fpath), str(self._data_dir / "test" / fpath.name))
 
     def _get_or_load_index(self, part):
         index_path = self._data_dir / f"{part}_index.json"
@@ -77,9 +75,9 @@ class LJspeechDataset(BaseDataset):
             wav_dir = Path(wav_dir)
             trans_path = list(self._data_dir.glob("*.csv"))[0]
             with trans_path.open() as f:
-                for line in f:
+                for i, line in enumerate(f):
                     w_id = line.split('|')[0]
-                    w_text = " ".join(line.split('|')[1:]).strip()
+                    w_text = line.split("|")[2].strip()
                     wav_path = wav_dir / f"{w_id}.wav"
                     if not wav_path.exists(): # elem in another part
                         continue
@@ -91,6 +89,24 @@ class LJspeechDataset(BaseDataset):
                                 "path": str(wav_path.absolute().resolve()),
                                 "text": w_text.lower(),
                                 "audio_len": length,
+                                "aligment_path": str(
+                                    self._data_dir / "alignments" / f"{i}.npy"
+                                ),
+                                "mel_path": str(
+                                    self._data_dir
+                                    / "mels"
+                                    / f"ljspeech-mel-{i+1:05d}.npy"
+                                ),
+                                "energy_path": str(
+                                    self._data_dir
+                                    / "energy"
+                                    / f"ljspeech-energy-{i+1:05d}.npy"
+                                ),
+                                "pitch_path": str(
+                                    self._data_dir
+                                    / "pitch"
+                                    / f"ljspeech-pitch-{i+1:05d}.npy"
+                                ),
                             }
                         )
         return index

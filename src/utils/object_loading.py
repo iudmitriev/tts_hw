@@ -7,11 +7,10 @@ from omegaconf.dictconfig import DictConfig
 
 import src.augmentations
 import src.datasets
-from src.base.base_text_encoder import BaseTextEncoder
 from src.collate_fn.collate import collate_fn
 
 
-def get_dataloaders(config: DictConfig, text_encoder: BaseTextEncoder):
+def get_dataloaders(config: DictConfig):
     dataloaders = {}
     for split, params in config["data"].items():
         num_workers = params.get("num_workers", 1)
@@ -29,8 +28,7 @@ def get_dataloaders(config: DictConfig, text_encoder: BaseTextEncoder):
         for ds_name, ds in params["datasets"].items():
             datasets.append(
                 hydra.utils.instantiate(
-                    ds, 
-                    text_encoder=text_encoder, 
+                    ds,
                     main_config=config,  
                     wave_augs=wave_augs, 
                     spec_augs=spec_augs,

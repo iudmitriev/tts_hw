@@ -7,180 +7,118 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import hydra
+import logging
 
 import src.model as module_model
 from src.trainer import Trainer
 from src.utils import ROOT_PATH
 from src.utils.object_loading import get_dataloaders
-from src.utils.parse_config import ConfigParser
-from src.metric.utils import calc_cer, calc_wer
 
-DEFAULT_CHECKPOINT_PATH = ROOT_PATH / "default_test_model" / "checkpoint.pth"
+from src.text import text_to_sequence
+
+from src.utils.waveglow import get_WaveGlow
+import waveglow as waveglow
+
+DEFAULT_CHECKPOINT_PATH = ROOT_PATH / "checkpoints" / "checkpoint.pth"
+DEFAULT_INPUT_PATH = ROOT_PATH / "test_texts.json"
+DEFAULT_RESULTS_PATH = ROOT_PATH / "results"
+
 
 @hydra.main(version_base=None, config_path="src", config_name="config")
-def main(config, out_file):
-    logger = config.get_logger("test")
+def main(config):
+
+    checkpoint_path, in_file, out_dir = parse_args()
+
+    logger = logging.getLogger("test")
 
     # define cpu or gpu if possible
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # text_encoder
-    text_encoder = config.get_text_encoder()
-
     # setup data_loader instances
-    dataloaders = get_dataloaders(config, text_encoder)
+    dataloaders = get_dataloaders(config)
 
     # build model architecture
-    model = config.init_obj(config["arch"], module_model, n_class=len(text_encoder))
+    model = hydra.utils.instantiate(config["arch"])
     logger.info(model)
 
-    logger.info("Loading checkpoint: {} ...".format(config.resume))
-    checkpoint = torch.load(config.resume, map_location=device)
+
+    logger.info(f"Loading checkpoint: {checkpoint_path} ...")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     state_dict = checkpoint["state_dict"]
     if config["n_gpu"] > 1:
         model = torch.nn.DataParallel(model)
     model.load_state_dict(state_dict)
 
+    waveglow_object = get_WaveGlow().to(device)
+
     # prepare model for testing
     model = model.to(device)
     model.eval()
-
-    results = []
-    cers = []
-    wers = []
-
+    
+    with open(in_file, 'r') as input_file:
+        input_texts = json.load(input_file)
+    
+    out_dir = Path(out_dir).absolute().resolve()
     with torch.no_grad():
-        for batch_num, batch in enumerate(tqdm(dataloaders["test"])):
-            batch = Trainer.move_batch_to_device(batch, device)
-            output = model(**batch)
-            if type(output) is dict:
-                batch.update(output)
-            else:
-                batch["logits"] = output
-            batch["log_probs"] = torch.log_softmax(batch["logits"], dim=-1)
-            batch["log_probs_length"] = model.transform_input_lengths(
-                batch["spectrogram_length"]
+        for i, text in enumerate(input_texts):
+            if isinstance(text, str):
+                text = {'text': text}
+
+            duration_control = text.get('duration_control', 1.0)
+            pitch_control = text.get('pitch_control', 1.0)
+            energy_control = text.get('energy_control', 1.0)
+            text = text['text']
+
+            src_sequence = torch.from_numpy(np.array(text_to_sequence(text, ["english_cleaners"])))
+
+            src_positions = [np.arange(1, int(src_sequence.shape[0]) + 1)]
+            src_positions = torch.from_numpy(np.array(src_positions)).to(device)
+            src_sequence = src_sequence.unsqueeze(0).to(device)
+            
+            output = model(
+                src_sequence=src_sequence, 
+                src_positions=src_positions,
+                duration_control=duration_control,
+                pitch_control=pitch_control,
+                energy_control=energy_control
             )
-            batch["probs"] = batch["log_probs"].exp().cpu()
-            batch["argmax"] = batch["probs"].argmax(-1)
-            for i in range(len(batch["text"])):
-                argmax = batch["argmax"][i]
-                argmax = argmax[: int(batch["log_probs_length"][i])]
-                result = {
-                        "ground_trurh": batch["text"][i],
-                        "pred_text_argmax": text_encoder.ctc_decode(argmax.cpu().numpy()),
-                        "pred_text_beam_search": text_encoder.ctc_beam_search(
-                            batch["probs"][i], batch["log_probs_length"][i], beam_size=512
-                        )[:10],
-                }
-                results.append(result)
+            melspec = output["mel_prediction"].squeeze()
+            mel = melspec.unsqueeze(0).contiguous().transpose(1, 2).to(device)
 
-                cers.append(calc_cer(result["ground_trurh"], result["pred_text_beam_search"][0].text))
-                wers.append(calc_wer(result["ground_trurh"], result["pred_text_beam_search"][0].text))
+            file_name = f'test_{text[:10]}_{duration_control:.1f}_{pitch_control:.1f}_{energy_control:.1f}.wav'
+            out_file = out_dir / file_name
+            waveglow.inference.inference(
+                mel, waveglow_object,
+                str(out_file)
+            )
 
 
-    print(f'CER on test: {np.mean(cers)}')
-    print(f'WER on test: {np.mean(wers)}')
-
-    with Path(out_file).open("w") as f:
-        json.dump(results, f, indent=2)
-
-
-if __name__ == "__main__":
-    raise NotImplementedError('test.py is not yet updated to hydra configs')
-    '''
-    args = argparse.ArgumentParser(description="PyTorch Template")
-    args.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        type=str,
-        help="config file path (default: None)",
-    )
+def parse_args():
+    args = argparse.ArgumentParser(description="Pytorch model test")
     args.add_argument(
         "-r",
         "--resume",
-        default=str(DEFAULT_CHECKPOINT_PATH.absolute().resolve()),
+        default=str(DEFAULT_CHECKPOINT_PATH),
         type=str,
-        help="path to latest checkpoint (default: None)",
-    )
-    args.add_argument(
-        "-d",
-        "--device",
-        default=None,
-        type=str,
-        help="indices of GPUs to enable (default: all)",
+        help="path to latest checkpoint (default: checkpoints/checkpoint.pth)",
     )
     args.add_argument(
         "-o",
         "--output",
-        default="output.json",
+        default=str(DEFAULT_RESULTS_PATH),
         type=str,
-        help="File to write results (.json)",
+        help="Folder to write results (default: results/)",
     )
     args.add_argument(
         "-t",
-        "--test-data-folder",
-        default=None,
+        "--texts",
+        default=str(DEFAULT_INPUT_PATH),
         type=str,
-        help="Path to dataset",
+        help="Path to json file, containing text pharases to turn into speech (default: test_texts.json)",
     )
-    args.add_argument(
-        "-b",
-        "--batch-size",
-        default=20,
-        type=int,
-        help="Test dataset batch size",
-    )
-    args.add_argument(
-        "-j",
-        "--jobs",
-        default=1,
-        type=int,
-        help="Number of workers for test dataloader",
-    )
-
     args = args.parse_args()
-    # set GPUs
-    #if args.device is not None:
-    #    os.environ["CUDA_VISIBLE_DEVICES"] = args.device
+    return args.resume, args.texts, args.output
 
-    # first, we need to obtain config with model parameters
-    # we assume it is located with checkpoint in the same folder
-    model_config = Path(args.resume).parent / "config.json"
-    with model_config.open() as f:
-        config = ConfigParser(json.load(f), resume=args.resume)
 
-    # update with addition configs from `args.config` if provided
-    if args.config is not None:
-        with Path(args.config).open() as f:
-            config.config.update(json.load(f))
-
-    # if `--test-data-folder` was provided, set it as a default test set
-    if args.test_data_folder is not None:
-        test_data_folder = Path(args.test_data_folder).absolute().resolve()
-        assert test_data_folder.exists()
-        config.config["data"] = {
-            "test": {
-                "batch_size": args.batch_size,
-                "num_workers": args.jobs,
-                "datasets": [
-                    {
-                        "type": "CustomDirAudioDataset",
-                        "args": {
-                            "audio_dir": str(test_data_folder / "audio"),
-                            "transcription_dir": str(
-                                test_data_folder / "transcriptions"
-                            ),
-                        },
-                    }
-                ],
-            }
-        }
-
-    assert config.config.get("data", {}).get("test", None) is not None
-    config["data"]["test"]["batch_size"] = args.batch_size
-    config["data"]["test"]["n_jobs"] = args.jobs
-
-    main(config, args.output)
-    '''
+if __name__ == "__main__":
+    main()

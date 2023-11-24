@@ -1,7 +1,7 @@
 from src.model.baseline_model import BaselineModel
-from src.model.deepspeech2 import DeepSpeech2Model
+from src.model.fast_speech_2.FastSpeech2 import FastSpeech2Model
 
 __all__ = [
     "BaselineModel",
-    "DeepSpeech2Model"
+    "FastSpeech2Model"
 ]

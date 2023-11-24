@@ -4,6 +4,7 @@ from random import shuffle
 
 import PIL
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
@@ -11,10 +12,14 @@ from torchvision.transforms import ToTensor
 from tqdm import tqdm
 
 from src.base import BaseTrainer
-from src.base.base_text_encoder import BaseTextEncoder
 from src.logger.utils import plot_spectrogram_to_buf
-from src.metric.utils import calc_cer, calc_wer
 from src.utils import inf_loop, MetricTracker
+from src.text import text_to_sequence
+
+from src.utils.waveglow import get_WaveGlow
+import waveglow as waveglow
+
+import torchaudio
 
 
 class Trainer(BaseTrainer):
@@ -31,14 +36,12 @@ class Trainer(BaseTrainer):
             config,
             device,
             dataloaders,
-            text_encoder,
             lr_scheduler=None,
             len_epoch=None,
             skip_oom=True,
     ):
         super().__init__(model, criterion, metrics, optimizer, config, device)
         self.skip_oom = skip_oom
-        self.text_encoder = text_encoder
         self.config = config
         self.train_dataloader = dataloaders["train"]
         if len_epoch is None:
@@ -53,18 +56,29 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
+            "loss", "mel_loss", "pitch_loss", "energy_loss", "duration_loss", "grad norm", *[m.name for m in self.metrics], writer=self.writer
         )
         self.evaluation_metrics = MetricTracker(
             "loss", *[m.name for m in self.metrics], writer=self.writer
         )
+
+        self.waveglow = get_WaveGlow().to(device)
 
     @staticmethod
     def move_batch_to_device(batch, device: torch.device):
         """
         Move all necessary tensors to the HPU
         """
-        for tensor_for_gpu in ["spectrogram", "text_encoded"]:
+        tensors = [
+            "src_sequence",
+            "src_positions",
+            "mel_target",
+            "duration_target", 
+            "pitch_target", 
+            "energy_target", 
+            "mel_positions"
+        ]
+        for tensor_for_gpu in tensors:
             batch[tensor_for_gpu] = batch[tensor_for_gpu].to(device)
         return batch
 
@@ -88,7 +102,6 @@ class Trainer(BaseTrainer):
                 tqdm(self.train_dataloader, desc="train", total=self.len_epoch)
         ):
             try:
-                self._log_audio(batch)
                 batch = self.process_batch(
                     batch,
                     is_train=True,
@@ -115,8 +128,7 @@ class Trainer(BaseTrainer):
                 self.writer.add_scalar(
                     "learning rate", self.lr_scheduler.get_last_lr()[0]
                 )
-                self._log_predictions(**batch)
-                self._log_spectrogram(batch["spectrogram"])
+                self._log_audio(batch["mel_prediction"])
                 self._log_scalars(self.train_metrics)
                 # we don't want to reset train metrics at the start of every epoch
                 # because we are interested in recent train metrics
@@ -142,19 +154,18 @@ class Trainer(BaseTrainer):
         else:
             batch["logits"] = outputs
 
-        batch["log_probs"] = F.log_softmax(batch["logits"], dim=-1)
-        batch["log_probs_length"] = self.model.transform_input_lengths(
-            batch["spectrogram_length"]
-        )
-        batch["loss"] = self.criterion(**batch)
         if is_train:
+            losses = self.criterion(**batch)
+            batch["loss"], batch["mel_loss"], batch["pitch_loss"], \
+                batch["energy_loss"], batch["duration_loss"] = losses
+            for loss_name in ["loss", "mel_loss", "pitch_loss", "energy_loss", "duration_loss"]:
+                metrics.update(loss_name, batch[loss_name].item())
             batch["loss"].backward()
             self._clip_grad_norm()
             self.optimizer.step()
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
-        metrics.update("loss", batch["loss"].item())
         for met in self.metrics:
             metrics.update(met.name, met(**batch))
         return batch
@@ -181,12 +192,8 @@ class Trainer(BaseTrainer):
                 )
             self.writer.set_step(epoch * self.len_epoch, part)
             self._log_scalars(self.evaluation_metrics)
-            self._log_predictions(**batch)
-            self._log_spectrogram(batch["spectrogram"])
-
-        # add histogram of model parameters to the tensorboard
-        for name, p in self.model.named_parameters():
-            self.writer.add_histogram(name, p, bins="auto")
+            self._log_audio(batch["mel_prediction"])
+            self._log_test_phrases()
         return self.evaluation_metrics.result()
 
     def _progress(self, batch_idx):
@@ -198,43 +205,6 @@ class Trainer(BaseTrainer):
             current = batch_idx
             total = self.len_epoch
         return base.format(current, total, 100.0 * current / total)
-
-    def _log_predictions(
-            self,
-            text,
-            log_probs,
-            log_probs_length,
-            audio_path,
-            examples_to_log=10,
-            *args,
-            **kwargs,
-    ):
-        # TODO: implement logging of beam search results
-        if self.writer is None:
-            return
-        argmax_inds = log_probs.cpu().argmax(-1).numpy()
-        argmax_inds = [
-            inds[: int(ind_len)]
-            for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
-        ]
-        argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
-        argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
-        tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path))
-        shuffle(tuples)
-        rows = {}
-        for pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
-            target = BaseTextEncoder.normalize_text(target)
-            wer = calc_wer(target, pred) * 100
-            cer = calc_cer(target, pred) * 100
-
-            rows[Path(audio_path).name] = {
-                "target": target,
-                "raw prediction": raw_pred,
-                "predictions": pred,
-                "wer": wer,
-                "cer": cer,
-            }
-        self.writer.add_table("predictions", pd.DataFrame.from_dict(rows, orient="index"))
 
     def _log_spectrogram(self, spectrogram_batch):
         spectrogram = random.choice(spectrogram_batch.cpu())
@@ -255,12 +225,42 @@ class Trainer(BaseTrainer):
         )
         return total_norm.item()
 
-    def _log_audio(self, audio_batch):
-        audio = random.choice(audio_batch['audio'].cpu())
-        self.writer.add_audio("audio", audio, sample_rate=self.config["preprocessing"]["sr"])
+    def _log_audio(self, spectrogram_batch):
+        melspec = random.choice(spectrogram_batch.cpu())
+        mel = melspec.unsqueeze(0).contiguous().transpose(1, 2).to(self.device)
+        waveglow.inference.inference(
+            mel, self.waveglow,
+            f"tmp/waveglow.wav"
+        )
+        audio, sr = torchaudio.load(f"tmp/waveglow.wav")
+        self.writer.add_audio("audio", audio, sample_rate=sr)
 
     def _log_scalars(self, metric_tracker: MetricTracker):
         if self.writer is None:
             return
         for metric_name in metric_tracker.keys():
             self.writer.add_scalar(f"{metric_name}", metric_tracker.avg(metric_name))
+
+    def _log_test_phrases(self):
+        texts = [
+            "A defibrillator is a device that gives a high energy electric shock to the heart of someone who is in cardiac arrest",
+            "Massachusetts Institute of Technology may be best known for its math, science and engineering education",
+            "Wasserstein distance or Kantorovich Rubinstein metric is a distance function defined between probability distributions on a given metric space"
+        ]
+        for i, text in enumerate(texts):        
+            src_sequence = torch.from_numpy(np.array(text_to_sequence(text, ["english_cleaners"])))
+
+            src_positions = [np.arange(1, int(src_sequence.shape[0]) + 1)]
+            src_positions = torch.from_numpy(np.array(src_positions)).to(self.device)
+            src_sequence = src_sequence.unsqueeze(0).to(self.device)
+            
+            self.model.eval()
+            output = self.model(src_sequence, src_positions)
+            melspec = output["mel_prediction"].squeeze()
+            mel = melspec.unsqueeze(0).contiguous().transpose(1, 2).to(self.device)
+            waveglow.inference.inference(
+                mel, self.waveglow,
+                f"results/waveglow{i}.wav"
+            )
+            audio, sr = torchaudio.load(f"results/waveglow{i}.wav")
+            self.writer.add_audio(f"test_audio_{i}", audio, sample_rate=sr)

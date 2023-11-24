@@ -11,7 +11,6 @@ from omegaconf.dictconfig import DictConfig
 import src.loss as module_loss
 import src.metric as module_metric
 import src.model as module_arch
-import src.text_encoder as module_text_encoder
 from src.trainer import Trainer
 from src.utils import prepare_device
 from src.utils.object_loading import get_dataloaders
@@ -30,17 +29,11 @@ def main(config: DictConfig):
     logger = logging.getLogger("train")
     logger.setLevel(logging.DEBUG)
 
-    # text_encoder
-    if "text_encoder" not in config:
-        text_encoder = module_text_encoder.CTCCharTextEncoder()
-    else:
-        text_encoder = hydra.utils.instantiate(config["text_encoder"])
-
     # setup data_loader instances
-    dataloaders = get_dataloaders(config, text_encoder)
+    dataloaders = get_dataloaders(config)
 
     # build model architecture, then print to console
-    model = hydra.utils.instantiate(config["arch"], n_class=len(text_encoder))
+    model = hydra.utils.instantiate(config["arch"])
     logger.info(model)
 
     # prepare for (multi-device) GPU training
@@ -52,10 +45,11 @@ def main(config: DictConfig):
     # get function handles of loss and metrics
     loss_module = hydra.utils.instantiate(config["loss"]).to(device)
 
-    metrics = [
-        hydra.utils.instantiate(metric, text_encoder=text_encoder)
-        for metric_name, metric in config["metrics"].items()
-    ]
+    #metrics = [
+    #    hydra.utils.instantiate(metric)
+    #    for metric_name, metric in config["metrics"].items()
+    #]
+    metrics = []
 
     # build optimizer, learning rate scheduler. delete every line containing lr_scheduler for
     # disabling scheduler
@@ -68,7 +62,6 @@ def main(config: DictConfig):
         loss_module,
         metrics,
         optimizer,
-        text_encoder=text_encoder,
         config=config,
         device=device,
         dataloaders=dataloaders,
@@ -81,3 +74,4 @@ def main(config: DictConfig):
 
 if __name__ == "__main__":
     main()
+

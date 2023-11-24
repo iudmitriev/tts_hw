@@ -11,6 +11,7 @@ from torch.utils.data import Dataset
 
 from omegaconf.dictconfig import DictConfig
 
+from src.text import text_to_sequence
 from src.base.base_text_encoder import BaseTextEncoder
 
 logger = logging.getLogger(__name__)
@@ -20,15 +21,14 @@ class BaseDataset(Dataset):
     def __init__(
             self,
             index,
-            text_encoder: BaseTextEncoder,
             main_config: DictConfig,
             wave_augs=None,
             spec_augs=None,
             limit=None,
             max_audio_length=None,
             max_text_length=None,
+            **kwargs
     ):
-        self.text_encoder = text_encoder
         self.config = main_config
         self.wave_augs = wave_augs
         self.spec_augs = spec_augs
@@ -43,16 +43,19 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, ind):
         data_dict = self._index[ind]
-        audio_path = data_dict["path"]
-        audio_wave = self.load_audio(audio_path)
-        audio_wave, audio_spec = self.process_wave(audio_wave)
+        mel_spec = torch.from_numpy(np.load(data_dict["mel_path"]))
+        duration = torch.from_numpy(np.load(data_dict["aligment_path"]))
+        pitch = torch.from_numpy(np.load(data_dict["pitch_path"]))
+        energy = torch.from_numpy(np.load(data_dict["energy_path"]))
+        text = data_dict["text"].strip()
+        character = np.array(text_to_sequence(text, ["english_cleaners"]))
+
         return {
-            "audio": audio_wave,
-            "spectrogram": audio_spec,
-            "duration": audio_wave.size(1) / self.config["preprocessing"]["sr"],
-            "text": data_dict["text"],
-            "text_encoded": self.text_encoder.encode(data_dict["text"]),
-            "audio_path": audio_path,
+            "mel_target": mel_spec,
+            "duration": duration,
+            "text": torch.from_numpy(character),
+            "pitch": pitch,
+            "energy": energy
         }
 
     @staticmethod
