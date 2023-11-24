@@ -1,5 +1,4 @@
 mkdir tmp
-mkdir results
 
 echo "Downloading dataset..."
 wget https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2 -o /dev/null
@@ -10,7 +9,7 @@ rm LJSpeech-1.1.tar.bz2
 
 echo "Downloading mels for dataset..."
 gdown https://drive.google.com/u/0/uc?id=1cJKJTmYd905a-9GFoo5gKjzhKjUVj83j
-tar -xvf mel.tar.gz -C data/datasets/ljspeech/mels
+tar -xvf mel.tar.gz -C data/datasets/ljspeech >> /dev/null
 rm mel.tar.gz
 
 echo "Downloading alignments for dataset..."

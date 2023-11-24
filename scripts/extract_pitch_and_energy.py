@@ -5,8 +5,7 @@ import pyworld
 import librosa
 from scipy import interpolate
 
-from src.utils import ROOT_PATH
-
+ROOT_PATH = Path(__file__).absolute().resolve().parent
 
 def extract_pitch(data_dir = None):
     if data_dir is None:
@@ -52,5 +51,9 @@ def extract_energy(data_dir = None):
 
 
 if __name__ == '__main__':
-    extract_pitch()
+    print('Extracting energy...')
     extract_energy()
+    print('Finished extracting energy!')
+    print('Extracting pitch...')
+    extract_pitch()
+    print('Finished extracting pitch!')

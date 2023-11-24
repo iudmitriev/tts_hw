@@ -2,28 +2,11 @@
 
 ## Installation guide
 
-#### Using docker
-The best way to use this project is using docker
-
-```shell 
-docker build -t src_image . 
-docker run \
-   --gpus '"device=0"' \
-   -it --rm \
-   -v /path/to/local/storage/dir:/repos/asr_project_template/data/datasets \
-   -e WANDB_API_KEY=<your_wandb_api_key> \
-	src_image python -m unittest 
-```
-Notes:
-
-* `-v /out/of/container/path:/inside/container/path` -- bind mount a path, so you wouldn't have to download datasets at
-  the start of every docker run.
-* `-e WANDB_API_KEY=<your_wandb_api_key>` -- set envvar for wandb (if you want to use it). You can find your API key
-  here: https://wandb.ai/authorize
-
+### Creating virtual enviroment
 
 #### Using poetry
-Alternatively, you can install all dependencies using [poetry](https://python-poetry.org/). 
+The best way to use this project is using [poetry](https://python-poetry.org/). 
+After installing poetry, run
 ```shell 
 poetry install
 ```
@@ -37,39 +20,66 @@ poetry run python train.py -c config.json
 ```
 
 Note:
-If you prefer this way and want to use CUDA with this project, you need to [install](https://developer.nvidia.com/cuda-11-8-0-download-archive) it separately. The supported version is 11.8.
+If you want to use CUDA with this project, you need to [install](https://developer.nvidia.com/cuda-11-8-0-download-archive) it separately. The supported version is 11.8.
+
+#### Using docker
+Alternatively, you can use docker
+
+```shell 
+docker build -t src_image . 
+docker run \
+   --gpus '"device=0"' \
+   -it --rm \
+   -v /path/to/local/storage/dir:/repos/asr_project_template/data/datasets \
+   -e WANDB_API_KEY=<your_wandb_api_key> \
+	src_image 
+```
+Notes:
+
+* `-v /out/of/container/path:/inside/container/path` -- bind mount a path, so you wouldn't have to download datasets at
+  the start of every docker run.
+* `-e WANDB_API_KEY=<your_wandb_api_key>` -- set envvar for wandb (if you want to use it). You can find your API key
+  here: https://wandb.ai/authorize
+
+### Downloading dataset and checkpoint
+To download ljspeech dataset, you should run
+```shell 
+chmod +x scripts/download_dataset.sh
+poetry run sh scripts/download_dataset.sh
+```
+To run model, you should calculate pitch and energy for all files in dataset by running 
+```shell 
+poetry run python scripts/extract_pitch_and_energy.py
+```
+To download model chekpoint, run
+```shell 
+chmod +x scripts/download_best_model.sh
+poetry run sh scripts/download_best_model.sh
+```
 
 ## Best model
 #### Description
-The best result was achieved using DeepSpeech2 model and librispeech-4-gram language model
+The model is a implementation of FastSpeech2 
 
-#### Download guide
-To download the best model weights and config, you need to run download_best_model.sh
+#### Download results
+To download the generated model files
 ```shell 
-sh download_best_model.sh
-
-# If you are using poetry, you should still start this line with poetry run
-# poetry run sh download_best_model.sh
+poetry run sh scripts/download_results.sh
 ```
 
 #### Training
 To train this model independently, you should run
 ```shell 
-python train.py -c src/configs/config.json
+poetry run python train.py
 ```
-
-#### Scores
-The best model achives the following scores on Librespeech dataset
-|  Dataset   |  CER   |  WER  |
-| ---------- | ------ | ----- |
-| test-clean |  4.36  | 11.23 |
-| test-other |  14.57 | 29.44 |
+The config for this model is file /src/config.yaml 
 
 #### Testing
-To verify score on Librespeech-test-other dataset you should download model and run
+To generate speech for specific text, you should change add it to test_texts.json and run
 ```shell 
-python test.py
+poetry run python test.py
 ```
+The resulting voice recording will appear in /results/
 
 ## Credits
 This homework was done by Ivan Dmitriev
